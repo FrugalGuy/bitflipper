@@ -1,5 +1,6 @@
 import base64
 from Crypto.Cipher import AES
+from Crypto.Hash   import SHA512
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Util.strxor import strxor
@@ -51,6 +52,15 @@ def decrypt(data,key):
     return ptext
 
 """
+Given a byte array, return the SHA-512 hash (as a byte array)
+Note that the SHA-512 is vulnerable to length extension attacks.
+"""
+def hashme(data):
+    h = SHA512.new()
+    h.update(data)
+    return h.digest()
+
+"""
 Return a byte array of the bitwise Exclusive OR of input byte arrays
 """
 def xor(a, b):
@@ -59,7 +69,9 @@ def xor(a, b):
 if __name__ == "__main__":
 
     print("A very simple data format: <role>  That's it. It either says USERS or ADMIN\n")
-    
+    ###
+    ###  Server Side
+    ###
     role = b'USERS'                             # 5 bytes of data
     
     print("Here is the payload: {0}".format(role), 
@@ -74,12 +86,16 @@ if __name__ == "__main__":
     b = encryptBytes(role, secret_key)
     
     #print(" Roundtrip test of Base64: {}".format(decrypt( encrypt("HI MOM",secret_key), secret_key) ))
-    print("The server sends out the encrypted cookie.",
-          "\nThe first block of that is the random IV. It's needed for decryption, and unique per message.",
+    print("The server sends out the encrypted cookie, which is two blocks long (32 bytes).",
+          "\nThe first block of that is the random IV. It's needed for decryption, and is unique per message.",
           "\nThe remainder is the encrypted payload. It may be padded to end in a full block of bytes.")
     print("Encrypted Cookie Data Bytes: {0}".format( encode(b, "hex") ))   
-    print("Random IV:                   {0}".format( encode(b[:16],"hex") ))
-    print("Padded Ciphertext Bytes:                                     {0}".format( encode(b[16:], "hex") ))
+    print("Composed of...    Random IV: {0}".format( encode(b[:16],"hex") ))
+    print("And...                              Padded Ciphertext Bytes: {0}".format( encode(b[16:], "hex") ))
+    print("For added 'security,' the app also sends a SHA-512 hash with the cookie.\n"
+          "It will check the digest it receives back to 'ensure' the cookie was not modified. This doesn't work, of course.")
+    h = hashme( b )
+    print("digest: {}".format( encode(h, "hex")))
 
     print("\nNow, the server will decrypt with the secret key, just to show what was sent. Should be 'USERS'")
     
@@ -88,6 +104,9 @@ if __name__ == "__main__":
     print("Decrypted result is {0}".format(ptext))
     print("Okay, that worked. Now let's try an attack\n" if ptext == b'USERS' else "Something went wrong!\n")
 
+    ###
+    ### Client Side
+    ###
     print("On the attacker's side ...\n",
           "\nWe flip some bits in the encrypted message, and see if the decrypted output can be changed successfully...",
           "\nWe XOR 'USERS' and 'ADMIN', then XOR that result with the first 5 bytes of the first block (the IV in this case)")
@@ -98,10 +117,18 @@ if __name__ == "__main__":
     fiddled = bytearray(xor_role_cipher + b[5:])  # in this case just fiddled with first 5 bytes of IV
     
     print("Modified crypto bytes is {0}".format( encode(fiddled, "hex") ),
-          "\nNotice the changed bytes:  ^^^^^^^^^^", 
-          "\nSending modified cookie back to Server for decryption, along with our Admin request...\n")
+          "\nNotice the changed bytes:  ^^^^^^^^^^   Notice that the rest of the message is unchanged.", 
+          "\nSending modified cookie back to Server for decryption, along with our Admin request...")
+    print("Oh. We also calculated a new digest for this modified cookie, so the server's check will succeed")
+    h_2 = hashme(fiddled)
+    print("modified digest: {}".format( encode(h_2, "hex")))
     
     ftext_output = decryptBytes(fiddled, secret_key)  # strips padding for us, if needed
-    
+
+    ###
+    ### Server Side
+    ###
+    print("\nNow back at the server, check the hash, then if okay, do the decryption to read the Role...")
+    print("Hash of received cookie matches received hash code (Duh!)" if hashme(fiddled) == h_2 else "Hash does not match!!")
     print("Decryption of modified message is {0}".format(ftext_output))
     print("It worked! Now the server treats you as an Administrator." if ftext_output == b'ADMIN' else "Something went wrong!")
