@@ -52,3 +52,8 @@ So, if the data you’re handling is not confidential, but needs integrity, use 
 
 As of January 2021, I suggest you use AES with mode GCM to get authenticated encryption with a minimum of fuss. As a bonus, GCM mode allows you to optionally add clear text data which will receive integrity protection but no encryption. Routing data or IP addresses, for example, might be a use for that.
 
+**How does the attack work?**
+
+To bit-flip any CBC-mode encrypted data, you need to know where the target bits appear in the encrypted data. You also need to know what they are when decrypted. This is easy if you can influence the generation of the encrypted message. You’ll need to calculate new values and place them one block earlier in the message than the bits you want to affect. When decrypted, the plaintext will have what you want rather than what was originally encrypted.
+XOR the known plaintext bytes with your desired plaintext bytes to create a block of mask bits. Now XOR the mask bits with the encrypted bits at the corresponding offset of the previous block.
+
