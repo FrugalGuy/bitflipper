@@ -16,6 +16,8 @@ pip uninstall crypto
 pip install cryptodome
 ```
 
+The program ``bitflip.py`` demonstrates the successful attack.  The program ``authenc.py`` demonstrates a correct program and the failure of the same attack attempts.
+
 
 ## Discussion
 TLDNR;
