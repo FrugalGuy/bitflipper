@@ -6,7 +6,7 @@ from Crypto.Util.Padding import pad, unpad
 from Crypto.Util.strxor import strxor
 from codecs import encode
 
-"""
+""" 
 Encrypt an array of bytes using AES in Cipher Block Chaining mode
 data: array of bytes to encrypt. This will pad if needed.
 key: array of key bytes. Must be a legal AES key length.
